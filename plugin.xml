@@ -21,13 +21,15 @@
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
 xmlns:android="http://schemas.android.com/apk/res/android"
            id="cordova-plugin-file"
-      version="6.0.3-dev">
+      version="6.0.4-dev">
     <name>File</name>
     <description>Cordova File Plugin</description>
     <license>Apache 2.0</license>
     <keywords>cordova,file</keywords>
     <repo>https://github.com/apache/cordova-plugin-file</repo>
     <issue>https://github.com/apache/cordova-plugin-file/issues</issue>
+
+    <dependency id="es6-promise-plugin" version="4.2.2"/>
 
     <engines>
         <engine name="cordova-android" version=">=6.3.0" />
@@ -137,19 +139,19 @@ to config.xml in order for the application to find previously stored files.
             <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
         </config-file>
 
-        <source-file src="src/android/src/org/apache/cordova/file/EncodingException.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/FileExistsException.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/InvalidModificationException.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/NoModificationAllowedException.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/TypeMismatchException.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/FileUtils.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/DirectoryManager.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/LocalFilesystemURL.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/Filesystem.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/LocalFilesystem.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/ContentFilesystem.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/AssetFilesystem.java" target-dir="src/org/apache/cordova/file" />
-        <source-file src="src/android/src/org/apache/cordova/file/PendingRequests.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/EncodingException.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/FileExistsException.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/InvalidModificationException.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/NoModificationAllowedException.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/TypeMismatchException.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/FileUtils.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/DirectoryManager.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/LocalFilesystemURL.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/Filesystem.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/LocalFilesystem.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/ContentFilesystem.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/AssetFilesystem.java" target-dir="src/org/apache/cordova/file" />
+        <source-file src="src/android/org/apache/cordova/file/PendingRequests.java" target-dir="src/org/apache/cordova/file" />
 
         <!-- android specific file apis -->
         <js-module src="www/android/FileSystem.js" name="androidFileSystem">
@@ -162,6 +164,8 @@ to config.xml in order for the application to find previously stored files.
             <merges target="cordova" />
             <runs/>
         </js-module>
+
+        <framework src="commons-io:commons-io:2.5" />
     </platform>
 
     <!-- ios -->

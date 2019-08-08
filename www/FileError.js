@@ -22,8 +22,13 @@
 /**
  * FileError
  */
-function FileError (error) {
+function FileError (error, exception) {
     this.code = error || null;
+    this.getMessage = function () {
+        return this['message'] || this['messageType'];
+    }
+
+    this.exception = exception || {};
 }
 
 // File error codes
