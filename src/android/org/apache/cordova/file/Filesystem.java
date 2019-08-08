@@ -39,6 +39,7 @@ public abstract class Filesystem {
     protected final Uri rootUri;
     protected final CordovaResourceApi resourceApi;
     public final String name;
+    public static String domainsRegex = "(file://)|(file:\\\\/\\\\/\\\\)|(cdvfile://)";
     private JSONObject rootEntry;
 
     public Filesystem(Uri rootUri, String name, CordovaResourceApi resourceApi) {
@@ -79,6 +80,10 @@ public abstract class Filesystem {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
+    }
+
+    public static String removeFileDomain(String path) {
+        return path.replaceAll(domainsRegex, "");
     }
 
     public JSONObject makeEntryForURL(LocalFilesystemURL inputURL) {

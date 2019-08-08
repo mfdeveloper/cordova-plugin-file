@@ -3,7 +3,7 @@ apply plugin: 'com.github.dcendents.android-maven'
 group = 'com.github.mfdeveloper'
 
 android {
-    compileSdkVersion 27
+    compileSdkVersion 28
 
     /** Reference:
      *  https://developer.android.com/studio/build/gradle-tips.html#change-default-source-set-configurations
@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         minSdkVersion 19
-        targetSdkVersion 27
+        targetSdkVersion 28
         versionCode 1
         versionName "1.0"
 
@@ -31,14 +31,31 @@ android {
         }
     }
 
+    testOptions.unitTests.includeAndroidResources = true
+
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'com.android.support:appcompat-v7:28.0.0'
+
+    /* --- Unit and integration tests libraries --- */
     testImplementation 'junit:junit:4.12'
+    testImplementation 'org.robolectric:robolectric:4.2'
+    testImplementation 'androidx.test:core:1.2.0'
+
+
+    /* --- Android UI tests ---*/
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+
     implementation ('com.github.mfdeveloper:cordova-android:7.1.1')
+
+    /**
+     * Reference: Avoid "Unable to merge Dex" exception
+     * https://stackoverflow.com/questions/47341975/unable-to-merge-dex-commons-apache
+     */
+    implementation group: 'commons-io', name: 'commons-io', version: '2.5'
+
 }
