@@ -23,13 +23,14 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Environment;
 import android.util.Base64;
+import android.util.Log;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.CordovaResourceApi;
 import org.apache.cordova.CordovaWebView;
 import org.apache.cordova.LOG;
 import org.apache.cordova.PermissionHelper;
@@ -44,8 +45,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
-import java.security.Permission;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -87,8 +88,6 @@ public class FileUtils extends CordovaPlugin {
 
     private PendingRequests pendingRequests;
 
-
-
     /*
      * We need both read and write when accessing the storage, I think.
      */
@@ -105,6 +104,13 @@ public class FileUtils extends CordovaPlugin {
     }
 
     private ArrayList<Filesystem> filesystems;
+    private Context context;
+
+    public FileUtils() { }
+
+    public FileUtils(Context context) {
+        this.context = context;
+    }
 
     public void registerFilesystem(Filesystem fs) {
     	if (fs != null && filesystemForName(fs.name)== null) {
@@ -121,8 +127,12 @@ public class FileUtils extends CordovaPlugin {
     	return null;
     }
 
-    protected String[] getExtraFileSystemsPreference(Activity activity) {
-        String fileSystemsStr = preferences.getString("androidextrafilesystems", "files,files-external,documents,sdcard,cache,cache-external,assets,root");
+    protected String[] getExtraFileSystemsPreference() {
+        String fileSystemsStr = "files,files-external,documents,sdcard,cache,cache-external,assets,root";
+        if (preferences != null) {
+            fileSystemsStr = preferences.getString("androidextrafilesystems", fileSystemsStr);
+        }
+
         return fileSystemsStr.split(",");
     }
 
@@ -136,7 +146,10 @@ public class FileUtils extends CordovaPlugin {
                 if (fsRoot != null) {
                     File newRoot = new File(fsRoot);
                     if (newRoot.mkdirs() || newRoot.isDirectory()) {
-                        registerFilesystem(new LocalFilesystem(fsName, webView.getContext(), webView.getResourceApi(), newRoot));
+                        if (webView != null) {
+
+                            registerFilesystem(new LocalFilesystem(fsName, webView.getContext(), webView.getResourceApi(), newRoot));
+                        }
                         installedFileSystems.add(fsName);
                     } else {
                        LOG.d(LOG_TAG, "Unable to create root dir for filesystem \"" + fsName + "\", skipping");
@@ -148,8 +161,8 @@ public class FileUtils extends CordovaPlugin {
         }
     }
 
-    protected HashMap<String, String> getAvailableFileSystems(Activity activity) {
-        Context context = activity.getApplicationContext();
+    protected HashMap<String, String> getAvailableFileSystems(Context context) {
+
         HashMap<String, String> availableFileSystems = new HashMap<String,String>();
 
         availableFileSystems.put("files", context.getFilesDir().getAbsolutePath());
@@ -178,15 +191,27 @@ public class FileUtils extends CordovaPlugin {
 
     	String tempRoot = null;
     	String persistentRoot = null;
+    	Context context = this.context;
 
-    	Activity activity = cordova.getActivity();
-    	String packageName = activity.getPackageName();
+    	if (cordova == null && webView == null) {
+    	    Log.w(LOG_TAG, "The cordova and webview are not found. It is correct?");
+        }
 
-        String location = preferences.getString("androidpersistentfilelocation", "internal");
+    	if (context == null && cordova != null) {
+    	    context = cordova.getActivity();
+        }
 
-    	tempRoot = activity.getCacheDir().getAbsolutePath();
+    	if (context == null) {
+            throw new RuntimeException("A context or activity is required to call initialize() method");
+        }
+
+    	String packageName = context.getPackageName();
+
+        String location = preferences != null ? preferences.getString("androidpersistentfilelocation", "internal") : "internal";
+
+    	tempRoot = context.getCacheDir().getAbsolutePath();
     	if ("internal".equalsIgnoreCase(location)) {
-    		persistentRoot = activity.getFilesDir().getAbsolutePath() + "/files/";
+    		persistentRoot = context.getFilesDir().getAbsolutePath() + "/files/";
     		this.configured = true;
     	} else if ("compatibility".equalsIgnoreCase(location)) {
     		/*
@@ -217,12 +242,17 @@ public class FileUtils extends CordovaPlugin {
     		// Note: The temporary and persistent filesystems need to be the first two
     		// registered, so that they will match window.TEMPORARY and window.PERSISTENT,
     		// per spec.
-    		this.registerFilesystem(new LocalFilesystem("temporary", webView.getContext(), webView.getResourceApi(), tmpRootFile));
-    		this.registerFilesystem(new LocalFilesystem("persistent", webView.getContext(), webView.getResourceApi(), persistentRootFile));
-    		this.registerFilesystem(new ContentFilesystem(webView.getContext(), webView.getResourceApi()));
-            this.registerFilesystem(new AssetFilesystem(webView.getContext().getAssets(), webView.getResourceApi()));
 
-            registerExtraFileSystems(getExtraFileSystemsPreference(activity), getAvailableFileSystems(activity));
+            if (webView != null) {
+
+                this.registerFilesystem(new LocalFilesystem("temporary", webView.getContext(), webView.getResourceApi(), tmpRootFile));
+                this.registerFilesystem(new LocalFilesystem("persistent", webView.getContext(), webView.getResourceApi(), persistentRootFile));
+                this.registerFilesystem(new ContentFilesystem(webView.getContext(), webView.getResourceApi()));
+                this.registerFilesystem(new AssetFilesystem(webView.getContext().getAssets(), webView.getResourceApi()));
+            }
+
+            Context appContext = cordova != null ? cordova.getActivity().getApplicationContext() : context;
+            registerExtraFileSystems(getExtraFileSystemsPreference(), getAvailableFileSystems(appContext));
 
     		// Initialize static plugin reference for deprecated getEntry method
     		if (filePlugin == null) {
@@ -230,7 +260,10 @@ public class FileUtils extends CordovaPlugin {
     		}
     	} else {
     		LOG.e(LOG_TAG, "File plugin configuration error: Please set AndroidPersistentFileLocation in config.xml to one of \"internal\" (for new applications) or \"compatibility\" (for compatibility with previous versions)");
-    		activity.finish();
+    		if (context instanceof Activity) {
+
+                ((Activity) context).finish();
+            }
     	}
     }
 
@@ -522,6 +555,13 @@ public class FileUtils extends CordovaPlugin {
                     callbackContext.success(entry);
                 }
             }, rawArgs, callbackContext);
+        } else if (action.equals("copy")) {
+            threadhelper( new FileOp( ){
+                public void run(JSONArray args) throws JSONException, IOException {
+                    JSONObject entry = copy(args);
+                    callbackContext.success(entry);
+                }
+            }, rawArgs, callbackContext);
         }
         else if (action.equals("readEntries")) {
             threadhelper( new FileOp( ){
@@ -662,32 +702,91 @@ public class FileUtils extends CordovaPlugin {
                 try {
                     JSONArray args = new JSONArray(rawArgs);
                     f.run(args);
-                } catch ( Exception e) {
-                    if( e instanceof EncodingException){
-                        callbackContext.error(FileUtils.ENCODING_ERR);
-                    } else if(e instanceof FileNotFoundException) {
-                        callbackContext.error(FileUtils.NOT_FOUND_ERR);
-                    } else if(e instanceof FileExistsException) {
-                        callbackContext.error(FileUtils.PATH_EXISTS_ERR);
-                    } else if(e instanceof NoModificationAllowedException ) {
-                        callbackContext.error(FileUtils.NO_MODIFICATION_ALLOWED_ERR);
-                    } else if(e instanceof InvalidModificationException ) {
-                        callbackContext.error(FileUtils.INVALID_MODIFICATION_ERR);
-                    } else if(e instanceof MalformedURLException ) {
-                        callbackContext.error(FileUtils.ENCODING_ERR);
-                    } else if(e instanceof IOException ) {
-                        callbackContext.error(FileUtils.INVALID_MODIFICATION_ERR);
-                    } else if(e instanceof EncodingException ) {
-                        callbackContext.error(FileUtils.ENCODING_ERR);
-                    } else if(e instanceof TypeMismatchException ) {
-                        callbackContext.error(FileUtils.TYPE_MISMATCH_ERR);
-                    } else if(e instanceof JSONException ) {
-                        callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION));
-                    } else if (e instanceof SecurityException) {
-                        callbackContext.error(FileUtils.SECURITY_ERR);
-                    } else {
+                } catch ( final Exception e) {
+
+                    try {
+
+                        JSONObject error = new JSONObject(){{
+                            put("exception", new JSONObject(){{
+                                put("name", e.getClass().getName());
+                                put("message", e.getMessage());
+                            }});
+                        }};
+
+                        Throwable cause = e.getCause();
+
+                        if (cause != null) {
+
+                            error.put("cause", cause.getMessage());
+                        }
+
+                        if( e instanceof EncodingException){
+
+                            error.put("code", FileUtils.ENCODING_ERR);
+                            error.put("messageType", "ENCODING_ERR");
+
+                        } else if(e instanceof FileNotFoundException) {
+
+                            error.put("code", FileUtils.NOT_FOUND_ERR);
+                            error.put("messageType", "NOT_FOUND_ERR");
+
+                        } else if(e instanceof FileExistsException) {
+
+                            error.put("code", FileUtils.PATH_EXISTS_ERR);
+                            error.put("messageType", "PATH_EXISTS_ERR");
+
+                        } else if(e instanceof NoModificationAllowedException ) {
+                            error.put("code", FileUtils.NO_MODIFICATION_ALLOWED_ERR);
+                            error.put("messageType", "NO_MODIFICATION_ALLOWED_ERR");
+
+                        } else if(e instanceof InvalidModificationException ) {
+
+                            error.put("code", FileUtils.INVALID_MODIFICATION_ERR);
+                            error.put("messageType", "INVALID_MODIFICATION_ERR");
+
+                        } else if(e instanceof MalformedURLException ) {
+
+                            error.put("code", FileUtils.ENCODING_ERR);
+                            error.put("messageType", "ENCODING_ERR");
+
+                        } else if(e instanceof IOException ) {
+
+                            error.put("code", FileUtils.INVALID_MODIFICATION_ERR);
+                            error.put("messageType", "INVALID_MODIFICATION_ERR");
+
+                        } else if(e instanceof TypeMismatchException ) {
+
+                            error.put("code", FileUtils.TYPE_MISMATCH_ERR);
+                            error.put("messageType", "TYPE_MISMATCH_ERR");
+
+                        } else if(e instanceof JSONException ) {
+
+                            error.put("code", FileUtils.TYPE_MISMATCH_ERR);
+                            error.put("messageType", "TYPE_MISMATCH_ERR");
+
+                            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION, error));
+                            return;
+
+                        } else if (e instanceof SecurityException) {
+
+                            error.put("code", FileUtils.SECURITY_ERR);
+                            error.put("messageType", "SECURITY_ERR");
+
+                        } else {
+
+                            error.put("code", FileUtils.UNKNOWN_ERR);
+                            error.put("messageType", "UNKNOWN_ERR");
+                        }
+
                         e.printStackTrace();
-                    	callbackContext.error(FileUtils.UNKNOWN_ERR);
+                        Log.e(LOG_TAG, e.getMessage(), e);
+
+                        callbackContext.error(error);
+
+                    } catch (JSONException jsonErr) {
+                        callbackContext.error(jsonErr.getMessage());
+
+                        Log.e(LOG_TAG, jsonErr.getMessage(), jsonErr);
                     }
                 }
             }
@@ -1007,6 +1106,32 @@ public class FileUtils extends CordovaPlugin {
         return ret;
     }
 
+    public static JSONObject makeEntry(File file) {
+        try {
+
+            JSONObject entry = new JSONObject();
+            entry.put("isFile", file.isFile());
+            entry.put("isDirectory", file.isDirectory());
+            entry.put("name", file.getName());
+            entry.put("fullPath", file.getPath());
+            // The file system can't be specified, as it would lead to an infinite loop,
+            // but the filesystem name can be.
+            entry.put("filesystemName", file.getName());
+            // Backwards compatibility
+            entry.put("filesystem", "temporary".equals(file.getName()) ? 0 : 1);
+
+            String nativeUrlStr = file.getAbsolutePath();
+            if (file.isDirectory() && !nativeUrlStr.endsWith("/")) {
+                nativeUrlStr += "/";
+            }
+            entry.put("nativeURL", nativeUrlStr);
+            return entry;
+        } catch (JSONException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
    /**
      * Returns a JSON object representing the given File. Internal APIs should be modified
      * to use URLs instead of raw FS paths wherever possible, when interfacing with this plugin.
@@ -1143,6 +1268,51 @@ public class FileUtils extends CordovaPlugin {
         }
 
     }
+
+    /**
+     * In replace to {@link LocalFilesystem#copyResource(CordovaResourceApi.OpenForReadResult, OutputStream)}
+     * to avoid unexpected errors when try copy, in devices that uses Android 9+
+     *
+     * @param args {@link JSONArray} of params passed from Cordova JS
+     * @return JSONObject Returns a Entry json object of a copied directory or file
+     * @throws JSONException
+     * @throws IOException
+     */
+    public JSONObject copy(JSONArray args) throws JSONException, IOException {
+
+        String srcFilePath = args.getString(0);
+        String destinyPath = args.getString(1);
+        String newName = args.optString(2, "");
+
+        File srcFile = new File(Filesystem.removeFileDomain(srcFilePath));
+        File destinyDir = new File(Filesystem.removeFileDomain(destinyPath));
+        File fileForEntry = null;
+
+        if (srcFile.isDirectory()) {
+
+            if (!newName.isEmpty()) {
+                fileForEntry = new File(destinyDir, newName);
+                org.apache.commons.io.FileUtils.copyDirectoryToDirectory(srcFile, fileForEntry);
+            } else {
+                org.apache.commons.io.FileUtils.copyDirectory(srcFile, destinyDir, true);
+            }
+
+            return makeEntry(fileForEntry != null ? fileForEntry : srcFile);
+        }
+
+        if (!newName.isEmpty()) {
+            fileForEntry = new File(destinyDir, newName);
+            org.apache.commons.io.FileUtils.copyFile(srcFile, fileForEntry, true);
+            return makeEntry(fileForEntry);
+        }
+
+        org.apache.commons.io.FileUtils.copyFileToDirectory(srcFile, destinyDir);
+
+        fileForEntry =  new File(destinyDir, srcFile.getName());
+        return makeEntry(fileForEntry);
+
+    }
+
 
     /**
      * Truncate the file to size

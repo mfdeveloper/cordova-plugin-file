@@ -29,6 +29,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import org.apache.cordova.CordovaResourceApi;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -475,6 +476,11 @@ public class LocalFilesystem extends Filesystem {
     // has a bug pre-4.0.0.
     // TODO: Once cordova-android@4.0.0 is released, delete this copy and make the plugin depend on
     // 4.0.0 with an engine tag.
+
+    /**
+     * @deprecated Use {@link FileUtils#copy(JSONArray)} instead, because this method uses {@link org.apache.commons.io.FileUtils#copyFile(File, File)}
+     *             that works without unexpected problems on Android 9+
+     */
     private static void copyResource(CordovaResourceApi.OpenForReadResult input, OutputStream outputStream) throws IOException {
         try {
             InputStream inputStream = input.inputStream;

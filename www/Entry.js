@@ -175,6 +175,44 @@ Entry.prototype.copyTo = function (parent, newName, successCallback, errorCallba
     exec(success, fail, 'File', 'copyTo', [srcURL, parent.toInternalURL(), name]);
 };
 
+Entry.prototype.copy = function (parent, newName) {
+
+    var self = this;
+    argscheck.checkArgs('oS', 'Entry.copy', arguments);
+
+    return new Promise(function(resolve, reject) {
+
+        var fail = reject && function (code) {
+            reject.apply(self, [new FileError(code)]);
+        };
+        var srcURL = self.toURL();
+        var destURL = parent.toURL();
+            // entry name
+        var name = newName || "";
+        // success callback
+        var success = function (entry) {
+            if (entry) {
+                if (typeof resolve == 'function') {
+                    // create appropriate Entry object
+                    var newFSName = entry.filesystemName || (entry.filesystem && entry.filesystem.name);
+                    var fs = newFSName ? new FileSystem(newFSName, { name: '', fullPath: '/' }) : new FileSystem(parent.filesystem.name, { name: '', fullPath: '/' }); // eslint-disable-line no-undef
+                    var result = (entry.isDirectory) ? new (require('./DirectoryEntry'))(entry.name, entry.fullPath, fs, entry.nativeURL) : new (require('cordova-plugin-file.FileEntry'))(entry.name, entry.fullPath, fs, entry.nativeURL);
+                    resolve.apply(self, [result]);
+                }
+            } else {
+                // no Entry object returned
+                if (fail) {
+                    fail(FileError.NOT_FOUND_ERR);
+                }
+            }
+        };
+    
+        // copy
+        exec(success, fail, 'File', 'copy', [srcURL, destURL, name]);
+
+    });
+};
+
 /**
  * Return a URL that can be passed across the bridge to identify this entry.
  */
@@ -255,6 +293,17 @@ Entry.prototype.getParent = function (successCallback, errorCallback) {
         errorCallback(new FileError(code));
     };
     exec(win, fail, 'File', 'getParent', [this.toInternalURL()]);
+};
+
+/**
+ * Look up the parent DirectoryEntry of this entry.
+ * @return {Promise<DirectoryEntry>} Returns a promise that resolves a parent DirectoryEntry 
+ */
+Entry.prototype.getParentAsync = function () {
+    var self = this;
+    return new Promise(function (resolve, reject) {
+        self.getParent(resolve, reject);
+    });
 };
 
 module.exports = Entry;
